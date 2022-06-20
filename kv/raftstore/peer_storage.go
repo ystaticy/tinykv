@@ -305,7 +305,7 @@ func ClearMeta(engines *engine_util.Engines, kvWB, raftWB *engine_util.WriteBatc
 }
 
 // Append the given entries to the raft log and update ps.raftState also delete log entries that will
-// never be committed(old leader's uncommitted log entries overwritten by new leader)
+// never be committed
 func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.WriteBatch) error {
 	// Your Code Here (2B).
 	if len(entries) == 0 {
@@ -319,8 +319,6 @@ func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.Write
 		raftWB.SetMeta(meta.RaftLogKey(ps.region.Id, entry.Index), &entry)
 	}
 
-	// delete previous logs, maybe some log already stabled,
-	// but not committed, overwritten by new leader
 	if appendLast < lastIndex {
 		for i := appendLast + 1; i <= lastIndex; i++ {
 			raftWB.DeleteMeta(meta.RaftLogKey(ps.region.Id, i))
@@ -384,7 +382,6 @@ func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, erro
 	raftWB := &engine_util.WriteBatch{}
 	var applySnapResult *ApplySnapResult
 	var err error
-	// apply snapshot
 	if !raft.IsEmptySnap(&ready.Snapshot) {
 		kvWB := &engine_util.WriteBatch{}
 		applySnapResult, err = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
@@ -400,7 +397,6 @@ func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, erro
 	if !raft.IsEmptyHardState(ready.HardState) {
 		ps.raftState.HardState = &ready.HardState
 	}
-	// save RaftLocalState
 	raftWB.SetMeta(meta.RaftStateKey(ps.region.Id), ps.raftState)
 	raftWB.WriteToDB(ps.Engines.Raft)
 	return applySnapResult, err
