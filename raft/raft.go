@@ -411,7 +411,7 @@ func (r *Raft) becomeFollower(term uint64, lead uint64) {
 	r.Agreed = 0
 	r.Rejected = 0
 	r.reset()
-	log.Infof("peerId[%d] become follower, Term: %d, LastIndex: %d\n", r.id, r.Term, r.RaftLog.LastIndex())
+	log.Debugf("peerId[%d] become follower, Term: %d, LastIndex: %d\n", r.id, r.Term, r.RaftLog.LastIndex())
 }
 
 // becomeCandidate transform this peer's state to candidate
