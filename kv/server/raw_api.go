@@ -40,6 +40,7 @@ func (server *Server) RawPut(_ context.Context, req *kvrpcpb.RawPutRequest) (*kv
 		Cf:    req.Cf,
 	}
 	batch := storage.Modify{Data: put}
+
 	err := server.storage.Write(req.Context, []storage.Modify{batch})
 	if err != nil {
 		return &kvrpcpb.RawPutResponse{}, err

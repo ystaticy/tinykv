@@ -50,6 +50,7 @@ type RaftLog struct {
 	pendingSnapshot *pb.Snapshot
 
 	// Your Data Here (2A).
+	// The first id behind snapshot
 	firstIndex uint64
 }
 

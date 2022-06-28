@@ -33,7 +33,7 @@ func newRaftWorker(ctx *GlobalContext, pm *router) *raftWorker {
 func (rw *raftWorker) run(closeCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var msgs []message.Msg
-	for { // do a while until close
+	for { // Do while until close
 		msgs = msgs[:0]
 		select {
 		case <-closeCh:

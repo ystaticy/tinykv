@@ -112,9 +112,13 @@ type Progress struct {
 }
 
 type Raft struct {
+
+	// id = n.allocID
 	id uint64
 
 	Term uint64
+
+	// To record who did you vote for
 	Vote uint64
 
 	// the log
@@ -135,6 +139,7 @@ type Raft struct {
 	msgs []pb.Message
 
 	// the leader id
+	// init=None , update in becomeFollower
 	Lead uint64
 
 	// heartbeat interval, should send
@@ -210,6 +215,7 @@ func (r *Raft) resetElectionTimeout() {
 	r.realElectionTimeout = r.electionTimeout + rand.Intn(r.electionTimeout)
 }
 
+// Reset Elapsed.Called after becomeXXX
 func (r *Raft) reset() {
 	r.electionElapsed = 0
 	r.heartbeatElapsed = 0
@@ -352,8 +358,8 @@ func (r *Raft) tickHeartbeat() {
 
 func (r *Raft) tickElection() {
 	r.electionElapsed++
-	//log.Debugf("%d electionElapsed: %d, realElectionTimeout: %d\n", r.id, r.electionElapsed, r.realElectionTimeout)
 	if r.electionElapsed >= r.realElectionTimeout {
+		// become a candidate
 		r.campaign()
 	}
 }
@@ -382,7 +388,6 @@ func (r *Raft) bcastHeartbeat() {
 }
 
 func (r *Raft) bCastVote() {
-	//fmt.Printf("%d vote req\n", r.id)
 	lastIndex := r.RaftLog.LastIndex()
 	lastTerm := mustTerm(r.RaftLog.Term(lastIndex))
 
@@ -418,9 +423,10 @@ func (r *Raft) becomeFollower(term uint64, lead uint64) {
 func (r *Raft) becomeCandidate() {
 	// Your Code Here (2A).
 	r.State = StateCandidate
+	// Vote to itself
 	r.Vote = r.id
 	r.Term += 1
-	// reset votes
+	// Reset votes
 	r.votes = make(map[uint64]bool)
 	r.Agreed = 1
 	r.Rejected = 0
@@ -443,14 +449,18 @@ func (r *Raft) becomeLeader() {
 		v.Next = r.RaftLog.LastIndex() + 1
 	}
 	r.reset()
-	// immediately append a noop entry
+
+	// 1. I becmoe a leader
 	r.appendEntries(&pb.Entry{
 		EntryType: pb.EntryType_EntryNormal,
 		Term:      r.Term,
 		Index:     r.RaftLog.LastIndex() + 1,
 		Data:      nil,
 	})
+
+	// 2. Notify others that I have become a leader
 	r.bcastAppend()
+
 	// for only one node
 	r.advanceCommitIndex()
 }
@@ -552,6 +562,7 @@ func (r *Raft) stepLeader(m pb.Message) {
 	}
 }
 
+// Push commmit index
 func (r *Raft) advanceCommitIndex() {
 	// If there exists an N such that N > commitIndex, a majority
 	// of matchIndex[i] ≥ N, and log[N].term
@@ -567,7 +578,6 @@ func (r *Raft) advanceCommitIndex() {
 	N := matchIndex[len(matchIndex)/2]
 	advanced := false
 	if N > r.RaftLog.committed {
-		//fmt.Println("N is ", N, " last is ", r.RaftLog.LastIndex())
 		term := mustTerm(r.RaftLog.Term(N))
 		if term == r.Term {
 			r.RaftLog.committed = N
@@ -586,6 +596,9 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 		r.replyAppendResp(m.From, true, 0)
 		return
 	}
+
+	// TODO : Don't call becomeFollower every Request. Just call becomeFollower when leader changed
+	// a candidate may also execute to this line
 	r.becomeFollower(m.Term, m.From)
 
 	// check prevLogIndex and prevLogTerm
@@ -629,6 +642,7 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 
 }
 
+// Handle by leader
 func (r *Raft) handleAppendResp(m pb.Message) {
 	if m.Term > r.Term {
 		r.becomeFollower(m.Term, m.From)
@@ -693,7 +707,7 @@ func (r *Raft) handleVoteResp(m pb.Message) {
 }
 
 // leader follower candidate can do this
-// m is requester
+// when I recieve a VoteReq, I will call handleVote, m is requester(Candidate)
 func (r *Raft) handleVote(m pb.Message) {
 	// req term is lower
 	if r.Term > m.Term {
@@ -728,6 +742,7 @@ func (r *Raft) handleVote(m pb.Message) {
 	r.replyVoteResp(m.From, true)
 }
 
+// term is getting higher or logindex is getting higher
 func (r *Raft) hasNewerLogs(logTerm, index uint64) bool {
 	lastIndex := r.RaftLog.LastIndex()
 	lastLogTerm := mustTerm(r.RaftLog.Term(lastIndex))
