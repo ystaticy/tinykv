@@ -366,6 +366,7 @@ func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_ut
 		StartKey: snapData.Region.StartKey,
 		EndKey:   snapData.Region.EndKey,
 	}
+	<-ch
 	result := &ApplySnapResult{
 		PrevRegion: ps.region,
 		Region:     snapData.Region,
@@ -381,22 +382,21 @@ func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, erro
 	// Your Code Here (2B/2C).
 	raftWB := &engine_util.WriteBatch{}
 	var applySnapResult *ApplySnapResult
-	var err error
+	var err error = nil
+	// apply snapshot
 	if !raft.IsEmptySnap(&ready.Snapshot) {
 		kvWB := &engine_util.WriteBatch{}
-		applySnapResult, err = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
-		if err != nil {
-			return nil, err
-		}
+		applySnapResult, _ = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
 		kvWB.WriteToDB(ps.Engines.Kv)
+		raftWB.WriteToDB(ps.Engines.Raft)
 	}
+	raftWB = &engine_util.WriteBatch{}
 	err = ps.Append(ready.Entries, raftWB)
-	if err != nil {
-		return nil, err
-	}
+
 	if !raft.IsEmptyHardState(ready.HardState) {
 		ps.raftState.HardState = &ready.HardState
 	}
+	// save RaftLocalState
 	raftWB.SetMeta(meta.RaftStateKey(ps.region.Id), ps.raftState)
 	raftWB.WriteToDB(ps.Engines.Raft)
 	return applySnapResult, err
