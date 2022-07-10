@@ -350,9 +350,6 @@ func (r *Raft) tick() {
 	if r.Term == 0 {
 		return
 	}
-	if r.Term == 5 && r.id%2 == 0 {
-		r.campaign()
-	}
 	if r.isLeader() {
 		r.tickHeartbeat()
 	} else {
